@@ -104,6 +104,40 @@ def test_remember_turns_stores_chat():
     assert "chat" in lb.memory.sources()
 
 
+def test_reading_twice_repeats_notes_and_question_and_once_does_not():
+    lb, model, _ = make(["a", "b"])
+    q = "Where is the silver compass?"
+    lb.ask(q, recall_rounds=0)  # defaults: reading="twice", notes="evidence"
+    twice = model.prompts[0]
+    assert twice.count(f"Question: {q}") == 1
+    assert f"Question (again): {q}" in twice
+    assert twice.count("silver compass beneath") == 2
+    lb.ask(q, recall_rounds=0, reading="once")
+    once = model.prompts[1]
+    assert "(again)" not in once and once.count("silver compass beneath") == 1
+
+
+def test_notes_modes_budget_and_validation():
+    import pytest
+
+    lb, model, _ = make(["ok", "ok", "ok"])
+    q = "Where is the silver compass?"
+    lb.ask(q, recall_rounds=0, notes="passages", reading="once")
+    assert "(novel#0)\nThe lighthouse" in model.prompts[0]  # whole-chunk format
+    lb.ask(q, recall_rounds=0, reading="once")
+    assert "(novel#0) The lighthouse" in model.prompts[1]  # sentence format
+    assert lb.last_notes.startswith("[1] (novel#0)")
+
+    lb.memory_tokens = 8  # reading="twice" halves it to 4 tokens per copy
+    lb.ask(q, recall_rounds=0, n_evidence=5)
+    assert "\n" not in lb.last_notes  # trimmed to a single evidence sentence
+
+    with pytest.raises(ValueError):
+        lb.ask(q, reading="thrice")
+    with pytest.raises(ValueError):
+        lb.ask(q, notes="everything")
+
+
 def test_presets_cover_the_collection():
     assert PRESETS["j-llm/Qwen3.5-2B-Longbook2"]["use_cache"] is False
     assert PRESETS["summerAIO/Qwen3.8-27B-Longbook27-VL-GDN64"]["auto"] == "multimodal"

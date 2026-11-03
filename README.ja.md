@@ -65,6 +65,24 @@ CLI: `python -m longbooklib add book.db novel.txt` ・ `python -m longbooklib se
 `Memory(path, embedder=SentenceTransformerEmbedder(), alpha=0.5)` を使ってください
 （既定モデルは `intfloat/multilingual-e5-small`。日本語・英語・中国語に対応）。
 
+## 再帰型（リニアアテンション）モデル向けの調整
+
+LongBook は一定サイズの再帰状態を持つため、プロンプト内の文章を完全には想起できません。そこで `ask()` は、
+論文に基づく次の 2 つを既定で有効にしています。どちらも無効にでき、`lb.last_notes` でモデルに実際に渡した
+ノートを確認できます。
+
+- `reading="twice"` — ノートと質問を 2 回与えます（文脈・質問・文脈・質問）。*Just Read Twice* のプロンプト
+  （[Arora ほか, 2024](https://arxiv.org/abs/2407.05483)）で、16 種類の再帰型 LM で平均 +11.0 ポイントの改善が
+  報告されています（追加学習なし）。トークン予算は 2 つのコピーで分け合います。
+- `notes="evidence"` — チャンク全体ではなく、質問に最も合う文だけ（`n_evidence=5`、`Memory.evidence()`）を渡し、
+  状態に保持させる量を減らします。この部分は LongBook での結果ではなく**こちらの推測**です。ハイブリッドモデルでは
+  正確な想起をアテンション層が担い、再帰状態だけになると失われること
+  （[arXiv:2609.04434](https://arxiv.org/abs/2609.04434)）、線形 RNN の状態容量が有限であること
+  （[arXiv:2607.07386](https://arxiv.org/abs/2607.07386)）を根拠にしています。
+
+自分のタスクで比較してください。例: `lb.ask(q, notes="passages", reading="once")`（従来の設定）と既定値の比較。
+未実装: [文脈認識デコーディング](https://arxiv.org/abs/2305.14739)（独自のデコードループが必要）。
+
 ## 対応モデル
 
 モデルカードに書かれた癖はプリセット（`longbooklib.PRESETS`）として自動適用されます。

@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "longbooklib"
-version = "0.1.0"
+version = "0.2.0"
 description = "Smart external memory (hybrid retrieval) that supplements the LongBook model series."
 readme = "README.md"
 requires-python = ">=3.9"

@@ -65,6 +65,25 @@ shared words but not paraphrases. For semantic search use
 `Memory(path, embedder=SentenceTransformerEmbedder(), alpha=0.5)` (default model:
 `intfloat/multilingual-e5-small`, covers English/Japanese/Chinese).
 
+## Tuning for recurrent (linear-attention) models
+
+LongBook models keep a fixed-size recurrent state, so text in the prompt is not recalled perfectly. `ask()`
+therefore defaults to two settings taken from the literature. Both can be switched off, and
+`lb.last_notes` shows exactly what the model was given.
+
+- `reading="twice"` – notes and question are given twice (context, question, context, question): the
+  *Just Read Twice* prompt ([Arora et al., 2024](https://arxiv.org/abs/2407.05483)), reported to add 11.0 points
+  on average over 16 recurrent LMs with no training. The token budget is split between the two copies.
+- `notes="evidence"` – only the best sentences (`n_evidence=5`, via `Memory.evidence()`) instead of whole chunks,
+  so there is less to hold in the state. This part is **our inference**, not a result on LongBook: hybrids keep
+  exact recall in their attention layers and lose it when only recurrent state remains
+  ([arXiv:2609.04434](https://arxiv.org/abs/2609.04434)), and linear-RNN state capacity is limited
+  ([arXiv:2607.07386](https://arxiv.org/abs/2607.07386)).
+
+Compare variants on your own task, e.g. `lb.ask(q, notes="passages", reading="once")` (the plain setup) against
+the defaults. Not implemented: [context-aware decoding](https://arxiv.org/abs/2305.14739), which needs a custom
+decoding loop.
+
 ## Supported models
 
 Quirks come from the model cards and are applied automatically (`longbooklib.PRESETS`):

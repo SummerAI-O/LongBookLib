@@ -64,6 +64,22 @@ print(mem.context("灯塔属于谁？", k=5, expand=1, budget=2000))
 `Memory(path, embedder=SentenceTransformerEmbedder(), alpha=0.5)`
 （默认模型 `intfloat/multilingual-e5-small`，支持中文、日文、英文）。
 
+## 针对循环（线性注意力）模型的调优
+
+LongBook 使用固定大小的循环状态，因此提示词中的文本不能被完整回忆。`ask()` 默认启用了两项来自论文的设置。
+两者都可以关闭，`lb.last_notes` 会显示实际交给模型的笔记。
+
+- `reading="twice"` —— 把笔记和问题各给两遍（上下文、问题、上下文、问题），即 *Just Read Twice* 提示
+  （[Arora 等，2024](https://arxiv.org/abs/2407.05483)）。论文报告在 16 个循环语言模型上平均提升 11.0 个点，
+  且无需训练。token 预算由两份内容平分。
+- `notes="evidence"` —— 只传入最相关的句子（`n_evidence=5`，通过 `Memory.evidence()`），而不是整块文本，
+  以减少需要状态记住的内容。这一项是**我们的推断**，并非 LongBook 上的实验结果：依据是混合模型的精确回忆
+  由注意力层承担，只剩循环状态时会丧失（[arXiv:2609.04434](https://arxiv.org/abs/2609.04434)），
+  以及线性 RNN 的状态容量有限（[arXiv:2607.07386](https://arxiv.org/abs/2607.07386)）。
+
+请在自己的任务上对比，例如 `lb.ask(q, notes="passages", reading="once")`（原来的设置）与默认值。
+未实现：[上下文感知解码](https://arxiv.org/abs/2305.14739)（需要自定义解码循环）。
+
 ## 支持的模型
 
 模型卡中提到的特殊要求已做成预设（`longbooklib.PRESETS`）并自动应用：

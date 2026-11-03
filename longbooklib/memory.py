@@ -19,7 +19,7 @@ from typing import Callable, Dict, List, Optional, Tuple
 
 import numpy as np
 
-from .chunker import chunk_text
+from .chunker import chunk_text, split_sentences
 from .embed import HashEmbedder, tokenize
 
 _SCHEMA = """
@@ -54,6 +54,17 @@ class Passage:
     source: str
     start: int  # first chunk seq
     end: int  # last chunk seq
+    text: str
+    score: float
+    rank: int
+
+
+@dataclass
+class Evidence:
+    """One sentence picked out of a retrieved chunk."""
+
+    source: str
+    seq: int  # seq of the chunk the sentence came from
     text: str
     score: float
     rank: int
@@ -309,6 +320,59 @@ class Memory:
             ts=self._ts[i],
         )
 
+    # -------------------------------------------------------------- evidence
+    def evidence(
+        self,
+        query: str,
+        n: int = 5,
+        k: int = 6,
+        source: Optional[str] = None,
+    ) -> List[Evidence]:
+        """The ``n`` best *sentences* for ``query``, picked from the top ``k`` chunks.
+
+        Far smaller than :meth:`passages`. That suits models with a small
+        recurrent state (fewer tokens to hold on to). Sentences are scored like
+        chunks: ``alpha``·(idf-weighted query-term overlap) + (1-alpha)·(dense
+        similarity), each normalised to 0-1, so a paraphrase with no shared
+        words can still win. Returned best-first.
+        """
+        hits = self.search(query, k=k, source=source)
+        cand = []  # (hit rank, sentence index, hit, sentence)
+        for r, h in enumerate(hits):
+            for j, s in enumerate(split_sentences(h.text)):
+                cand.append((r, j, h, s.strip()))
+        if not cand:
+            return []
+        qtoks = set(tokenize(query))
+        total = self._n
+
+        def idf(t: str) -> float:
+            df = len(self._post.get(t, ()))
+            return math.log(1.0 + (total - df + 0.5) / (df + 0.5)) if df else 0.0
+
+        lex = np.array(
+            [sum(idf(t) for t in qtoks & set(tokenize(c[3]))) for c in cand], dtype=np.float32
+        )
+        if lex.max() > 0:
+            lex = lex / lex.max()
+        enc_q = getattr(self.embedder, "encode_query", self.embedder.encode)
+        q = np.asarray(enc_q([query]), dtype=np.float32)[0]
+        dense = np.asarray(self.embedder.encode([c[3] for c in cand]), dtype=np.float32) @ q
+        span = float(dense.max() - dense.min())
+        dense = (dense - dense.min()) / span if span > 1e-9 else np.ones_like(dense)
+        score = self.alpha * lex + (1.0 - self.alpha) * dense
+        best = sorted(range(len(cand)), key=lambda i: (-float(score[i]), cand[i][0], cand[i][1]))[:n]
+        return [
+            Evidence(
+                source=cand[i][2].source,
+                seq=cand[i][2].seq,
+                text=cand[i][3],
+                score=float(score[i]),
+                rank=r,
+            )
+            for r, i in enumerate(best)
+        ]
+
     # -------------------------------------------------------------- passages
     def passages(
         self,
@@ -378,6 +442,10 @@ class Memory:
     def context(self, query: str, **kw) -> str:
         """Retrieve and format notes ready to paste into a prompt."""
         return format_passages(self.passages(query, **kw))
+
+
+def format_evidence(evidence: List[Evidence]) -> str:
+    return "\n".join(f"[{n}] ({e.source}#{e.seq}) {e.text}" for n, e in enumerate(evidence, 1))
 
 
 def format_passages(passages: List[Passage]) -> str:

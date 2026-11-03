@@ -23,6 +23,11 @@ def _pieces(text: str) -> List[str]:
     return out
 
 
+def split_sentences(text: str) -> List[str]:
+    """Contiguous sentence pieces (same boundary rule as :func:`chunk_text`)."""
+    return [p for p in _pieces(text) if p.strip()]
+
+
 def chunk_text(text: str, max_chars: int = 1000) -> List[str]:
     """Split ``text`` into chunks of at most ``max_chars`` characters.
 
