@@ -107,7 +107,7 @@ def test_remember_turns_stores_chat():
 def test_reading_twice_repeats_notes_and_question_and_once_does_not():
     lb, model, _ = make(["a", "b"])
     q = "Where is the silver compass?"
-    lb.ask(q, recall_rounds=0)  # defaults: reading="twice", notes="evidence"
+    lb.ask(q, recall_rounds=0, reading="twice", notes="evidence")
     twice = model.prompts[0]
     assert twice.count(f"Question: {q}") == 1
     assert f"Question (again): {q}" in twice
@@ -117,6 +117,14 @@ def test_reading_twice_repeats_notes_and_question_and_once_does_not():
     assert "(again)" not in once and once.count("silver compass beneath") == 1
 
 
+def test_defaults_are_the_plain_measured_setup():
+    lb, model, _ = make(["ok"])
+    lb.ask("Where is the silver compass?", recall_rounds=0)
+    p = model.prompts[0]
+    assert "(novel#0)\nThe lighthouse" in p  # whole passages, not single sentences
+    assert "(again)" not in p  # read once
+
+
 def test_notes_modes_budget_and_validation():
     import pytest
 
@@ -124,12 +132,12 @@ def test_notes_modes_budget_and_validation():
     q = "Where is the silver compass?"
     lb.ask(q, recall_rounds=0, notes="passages", reading="once")
     assert "(novel#0)\nThe lighthouse" in model.prompts[0]  # whole-chunk format
-    lb.ask(q, recall_rounds=0, reading="once")
+    lb.ask(q, recall_rounds=0, reading="once", notes="evidence")
     assert "(novel#0) The lighthouse" in model.prompts[1]  # sentence format
     assert lb.last_notes.startswith("[1] (novel#0)")
 
     lb.memory_tokens = 8  # reading="twice" halves it to 4 tokens per copy
-    lb.ask(q, recall_rounds=0, n_evidence=5)
+    lb.ask(q, recall_rounds=0, notes="evidence", reading="twice", n_evidence=5)
     assert "\n" not in lb.last_notes  # trimmed to a single evidence sentence
 
     with pytest.raises(ValueError):

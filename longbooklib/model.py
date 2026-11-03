@@ -175,8 +175,8 @@ class LongBookModel:
         max_new_tokens: int = 512,
         recall_rounds: int = 2,
         remember_turns: bool = False,
-        reading: str = "twice",
-        notes: str = "evidence",
+        reading: str = "once",
+        notes: str = "passages",
         n_evidence: int = 5,
         **gen,
     ) -> str:
@@ -190,6 +190,10 @@ class LongBookModel:
           The token budget is split between the two copies.
         * ``notes="evidence"`` passes only the ``n_evidence`` best sentences;
           ``"passages"`` passes whole chunks with ``expand`` neighbours.
+
+        Both are opt-in. The defaults (``"once"`` / ``"passages"``) are the setup
+        that was measured: on a LongBench QA subset with Qwen3.5-9B, whole passages
+        beat sentence-only notes on all three tasks.
 
         If the model replies ``<recall>query</recall>`` the memory is searched
         again (up to ``recall_rounds`` times) before the final answer.

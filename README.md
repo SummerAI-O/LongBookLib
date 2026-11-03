@@ -68,7 +68,7 @@ shared words but not paraphrases. For semantic search use
 ## Tuning for recurrent (linear-attention) models
 
 LongBook models keep a fixed-size recurrent state, so text in the prompt is not recalled perfectly. `ask()`
-therefore defaults to two settings taken from the literature. Both can be switched off, and
+therefore offers two opt-in settings taken from the literature (both are off by default), and
 `lb.last_notes` shows exactly what the model was given.
 
 - `reading="twice"` – notes and question are given twice (context, question, context, question): the
@@ -80,9 +80,9 @@ therefore defaults to two settings taken from the literature. Both can be switch
   ([arXiv:2609.04434](https://arxiv.org/abs/2609.04434)), and linear-RNN state capacity is limited
   ([arXiv:2607.07386](https://arxiv.org/abs/2607.07386)).
 
-Compare variants on your own task, e.g. `lb.ask(q, notes="passages", reading="once")` (the plain setup) against
-the defaults. Not implemented: [context-aware decoding](https://arxiv.org/abs/2305.14739), which needs a custom
-decoding loop.
+So far (see "Measured" below) `notes="evidence"` did **not** help a capable model, so the default stays
+`notes="passages"`; `reading="twice"` has not been measured yet. Compare variants on your own task. Not
+implemented: [context-aware decoding](https://arxiv.org/abs/2305.14739), which needs a custom decoding loop.
 
 ## Supported models
 
@@ -110,10 +110,25 @@ Decoding is greedy; pass any `generate` kwarg to `ask(...)`.
 - Synthetic needle test (200 documents, ~5.3k chunks, one rare-name fact each): recall@1 = 200/200 with the
   default setup, ~1 ms per query on CPU. The names are unique, which favours BM25 – treat it as a sanity check,
   not a benchmark of answer quality.
-- The test-suite (`pytest`, 23 tests) runs without torch; the model wrapper is tested with stub models.
-  **It has not been run against the real LongBook weights yet.** Notes from the cards: remote code is executed
-  on load (pin a `revision`); the 27B models need the whole model on GPU (no CPU offload); the 9B card says the
-  plain-`transformers` path is unverified.
+- LongBench v1, English QA (qasper, multifieldqa_en, hotpotqa; **10 questions each**; QA F1, mean of the three).
+  `full` is the official prompt with middle-truncation to 8k tokens; the memory arms use the same official prompt
+  with retrieved notes of at most 3k tokens:
+
+  | model | full (8k) | mem-passages | mem-evidence |
+  |---|---|---|---|
+  | Qwen3.5-9B (original) | 46.0 | **51.6** | 44.8 |
+  | Qwen3.5-9B-Longbook9-GDN32-x2 | 7.5 | 8.2 | 6.0 |
+
+  With only 10 questions per task, differences of a few points are noise, and `full` loses part of long documents
+  to truncation. What it does suggest: for a capable model, retrieved passages match or beat truncated full
+  context at 1.5–2× lower latency, and sentence-only notes were worse on all three tasks.
+- **The converted 9B LongBook scores far below the original in every setup, so external memory cannot fix it:
+  the model itself reads its prompt poorly.** Diagnostics: it prefers the right answer in a 12-way choice 9/12
+  times (chance ≈ 1) but derails in free generation, and `use_cache` makes no difference. Nothing here was
+  tried on the 2B or 27B models.
+- The test-suite (`pytest`, 29 tests) runs without torch; the model wrapper is tested with stub models. Notes
+  from the cards: remote code is executed on load (pin a `revision`); the 27B models need the whole model on GPU
+  (no CPU offload).
 
 ## Tests
 
