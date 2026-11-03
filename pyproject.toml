@@ -1,0 +1,27 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "longbooklib"
+version = "0.1.0"
+description = "Smart external memory (hybrid retrieval) that supplements the LongBook model series."
+readme = "README.md"
+requires-python = ">=3.9"
+license = { text = "Apache-2.0" }
+dependencies = ["numpy>=1.22"]
+
+[project.optional-dependencies]
+hf = ["transformers", "accelerate", "torch"]
+semantic = ["sentence-transformers"]
+test = ["pytest"]
+
+[project.scripts]
+longbook = "longbooklib.__main__:main"
+
+[tool.setuptools.packages.find]
+include = ["longbooklib*"]
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
+testpaths = ["tests"]
